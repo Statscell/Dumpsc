@@ -1,22 +1,21 @@
 # Dumpsc
-**Dumpsc** is an adapted version of [cr-sc-dump](https://github.com/123456abcdef/cr-sc-dump). This version aim to support all kind of **_tex.sc** files from different Supercell games.
 
-
+**Dumpsc** is a python project which helps you to decode and extract images from supercell files.
 
 ## Usage
 
-If your file is compressed run the following command:
+Create **In-Compressed** directory and include the `*.sc` files in the directory.
 
-> python dumpsc.py <your_tex_sc_file> -d
+Then simply run:
+> python Main.py
 
-else simply use:
+## Credits
 
-> python dumpsc.py <your_tex_sc_file>
+I can say I have done almot nothing in this project other than making it easy to use and good to look at.
 
+- [Galaxy1036/Dumpsc](https://github.com/Galaxy1036/Dumpsc): The original Dumpsc
+- [MasterDevX/XCoder](https://github.com/MasterDevX/XCoder): The original Xcoder. _It's code is used to cut sprites_
 
+## ⚠️ Information ⚠️
 
-## Dependencies
-
-To install **Dumpsc** dependencies run the following command:
-
-> python -m pip install -r requirements.txt
+This content is not affiliated with, endorsed, sponsored, or specifically approved by Supercell and Supercell is not responsible for it. For more information see Supercell’s Fan Content Policy.
