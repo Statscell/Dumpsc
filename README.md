@@ -16,6 +16,15 @@ I can say I have done almot nothing in this project other than making it easy to
 - [Galaxy1036/Dumpsc](https://github.com/Galaxy1036/Dumpsc): The original Dumpsc
 - [MasterDevX/XCoder](https://github.com/MasterDevX/XCoder): The original Xcoder. _It's code is used to cut sprites_
 
+## Supporting Games
+
+These are the games I have tested with:
+
+- Clash of Clans
+- Clash Royale
+- Brawl Stars
+- Clash Quest
+
 ## ⚠️ Information ⚠️
 
 This content is not affiliated with, endorsed, sponsored, or specifically approved by Supercell and Supercell is not responsible for it. For more information see Supercell’s Fan Content Policy.
