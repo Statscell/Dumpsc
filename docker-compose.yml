@@ -1,0 +1,10 @@
+version: "3.6"
+
+services:
+  dumpsc:
+    container_name: dumpsc
+    build:
+      context: .
+    volumes:
+      - ./Out-Sprites:/app/Out-Sprites
+      - ./In-Compressed:/app/In-Compressed

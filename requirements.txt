@@ -2,3 +2,5 @@ Pillow
 pylzham
 zstandard
 colorama
+pyliblzfse
+astc_decomp
