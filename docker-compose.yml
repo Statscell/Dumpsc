@@ -6,5 +6,5 @@ services:
     build:
       context: .
     volumes:
-      - ./Out-Sprites:/app/Out-Sprites
-      - ./In-Compressed:/app/In-Compressed
+      - ./Out-Sprites:/Out-Sprites
+      - ./In-Compressed:/In-Compressed

@@ -11,7 +11,7 @@ Then simply run:
 
 ## Credits
 
-I can say I have done almot nothing in this project other than making it easy to use and good to look at.
+I can say I have done almost nothing in this project other than making it easy to use and good to look at.
 
 - [Galaxy1036/Dumpsc](https://github.com/Galaxy1036/Dumpsc): The original Dumpsc
 - [MasterDevX/XCoder](https://github.com/MasterDevX/XCoder): The original Xcoder. _It's code is used to cut sprites_
