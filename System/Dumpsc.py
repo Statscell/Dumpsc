@@ -6,10 +6,56 @@ import lzma
 import lzham
 import struct
 import zstandard
-
 from PIL import Image
-
 from System.Logger import Console
+import astc_decomp
+import liblzfse
+
+def load_ktx(data):
+    header = data[:64]
+    ktx_data = data[64:]
+
+    if header[12:16] == bytes.fromhex('01020304'):
+        endianness = '<'
+
+    else:
+        endianness = '>'
+
+    if header[0:7] != b'\xabKTX 11':
+        raise TypeError('Unsupported or unknown KTX version: {}'.format(header[0:7]))
+
+    glInternalFormat, = struct.unpack(endianness + 'I', header[28:32])
+    pixelWidth, pixelHeight = struct.unpack(endianness + '2I', header[36:44])
+    bytesOfKeyValueData, = struct.unpack(endianness + 'I', header[60:64])
+
+    if glInternalFormat not in (0x93B0, 0x93B4, 0x93B7):
+        raise TypeError('Unsupported texture format: {}'.format(hex(glInternalFormat)))
+
+    if glInternalFormat == 0x93B0:
+        block_width, block_height = 4, 4
+
+    elif glInternalFormat == 0x93B4:
+        block_width, block_height = 6, 6
+
+    else:
+        block_width, block_height = 8, 8
+
+    key_value_data = ktx_data[:bytesOfKeyValueData]
+    ktx_data = ktx_data[bytesOfKeyValueData:]
+
+    if b'Compression_APPLE' in key_value_data:
+        if ktx_data[12:15] == b'bvx':
+            image_data = liblzfse.decompress(ktx_data[12:])
+
+        else:
+            raise ValueError('Unsupported compression type: {}'.format(
+                ktx_data[12:15])
+            )
+
+    else:
+        image_data = ktx_data[4:]
+
+    return Image.frombytes('RGBA', (pixelWidth, pixelHeight), image_data, 'astc', (block_width, block_height, False))
 
 
 def convert_pixel(pixel, type):
@@ -109,67 +155,76 @@ def process_sc(baseName, data, path, decompress):
 
     while len(decompressed[i:]) > 5:
         fileType, = struct.unpack('<b', bytes([decompressed[i]]))
+
+        if fileType == 0x2D:
+            i += 4  # Ignore this uint32, it's basically the fileSize + the size of subType + width + height (9 bytes)
+
         fileSize, = struct.unpack('<I', decompressed[i + 1:i + 5])
         subType, = struct.unpack('<b', bytes([decompressed[i + 5]]))
         width, = struct.unpack('<H', decompressed[i + 6:i + 8])
         height, = struct.unpack('<H', decompressed[i + 8:i + 10])
         i += 10
 
-        if subType in (0, 1):
-            pixelSize = 4
-        elif subType in (2, 3, 4, 6):
-            pixelSize = 2
-        elif subType == 10:
-            pixelSize = 1
-        else:
-            raise Exception("Unknown pixel type {}.".format(subType))
+        if fileType != 0x2D:
+            if subType in (0, 1):
+                pixelSize = 4
+            elif subType in (2, 3, 4, 6):
+                pixelSize = 2
+            elif subType == 10:
+                pixelSize = 1
+            elif subType != 15:
+                raise Exception("Unknown pixel type {}.".format(subType))
 
-        # Console.info(' └── fileType: {}, fileSize: {}, subType: {}, width: {}, height: {}'.format(fileType, fileSize, subType, width, height))
+            if subType == 15:
+                ktx_size, = struct.unpack('<I', decompressed[i:i + 4])
+                img = load_ktx(decompressed[i + 4: i + 4 + ktx_size])
+                i += 4 + ktx_size
 
-        img = Image.new("RGBA", (width, height))
-        pixels = []
+            else:
+                img = Image.new("RGBA", (width, height))
+                pixels = []
 
-        for y in range(height):
-            for x in range(width):
-                pixels.append(convert_pixel(
-                    decompressed[i:i + pixelSize], subType))
-                i += pixelSize
+                for y in range(height):
+                    for x in range(width):
+                        pixels.append(convert_pixel(decompressed[i:i + pixelSize], subType))
+                        i += pixelSize
 
-        img.putdata(pixels)
+                img.putdata(pixels)
 
-        if fileType == 29 or fileType == 28 or fileType == 27:
-            imgl = img.load()
-            iSrcPix = 0
+            if fileType == 29 or fileType == 28 or fileType == 27:
+                imgl = img.load()
+                iSrcPix = 0
 
-            for l in range(height // 32):  # block of 32 lines
-                # normal 32-pixels blocks
+                for l in range(height // 32):  # block of 32 lines
+                    # normal 32-pixels blocks
+                    for k in range(width // 32):  # 32-pixels blocks in a line
+                        for j in range(32):  # line in a multi line block
+                            for h in range(32):  # pixels in a block
+                                imgl[h + (k * 32), j + (l * 32)] = pixels[iSrcPix]
+                                iSrcPix += 1
+                    # line end blocks
+                    for j in range(32):
+                        for h in range(width % 32):
+                            imgl[h + (width - (width % 32)), j + (l * 32)] = pixels[iSrcPix]
+                            iSrcPix += 1
+                # final lines
                 for k in range(width // 32):  # 32-pixels blocks in a line
-                    for j in range(32):  # line in a multi line block
-                        for h in range(32):  # pixels in a block
-                            imgl[h + (k * 32), j + (l * 32)] = pixels[iSrcPix]
+                    for j in range(height % 32):  # line in a multi line block
+                        for h in range(32):  # pixels in a 32-pixels-block
+                            imgl[h + (k * 32), j + (height - (height % 32))] = pixels[iSrcPix]
                             iSrcPix += 1
                 # line end blocks
-                for j in range(32):
+                for j in range(height % 32):
                     for h in range(width % 32):
-                        imgl[h + (width - (width % 32)), j +
-                             (l * 32)] = pixels[iSrcPix]
+                        imgl[h + (width - (width % 32)), j + (height - (height % 32))] = pixels[iSrcPix]
                         iSrcPix += 1
-            # final lines
-            for k in range(width // 32):  # 32-pixels blocks in a line
-                for j in range(height % 32):  # line in a multi line block
-                    for h in range(32):  # pixels in a 32-pixels-block
-                        imgl[h + (k * 32), j + (height - (height % 32))
-                             ] = pixels[iSrcPix]
-                        iSrcPix += 1
-            # line end blocks
-            for j in range(height % 32):
-                for h in range(width % 32):
-                    imgl[h + (width - (width % 32)), j +
-                         (height - (height % 32))] = pixels[iSrcPix]
-                    iSrcPix += 1
+
+        else:
+            img = load_ktx(decompressed[i:i + fileSize])
+            i += fileSize
 
         img.save(path + baseName + ('_' * picCount) + '.png', 'PNG')
-        images.append(img)
         picCount += 1
+        images.append(img)
 
     return images
