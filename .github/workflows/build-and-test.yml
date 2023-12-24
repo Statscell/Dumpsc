@@ -1,0 +1,66 @@
+name: Build and Test
+
+on:
+  push:
+    branches: master
+
+env:
+  GCP_BUCKET_NAME: game-assets-clashofclans.appspot.com
+  FINGERPRINT: b8cb4e1c4ee7485bafc34123e4cb2b5b869b4f93
+  GAME_ASSET_URL: https://game-assets.clashofclans.com
+  SC_FILE_NAME: ui_cc.sc
+  SC_TEX_FILE_NAME: ui_cc_tex.sc
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Docker Build
+        run: docker build --tag dumpsc:latest ./
+
+      - name: Download Test File
+        run: |
+          mkdir In-Compressed
+          curl -o In-Compressed/$SC_FILE_NAME $GAME_ASSET_URL/$FINGERPRINT/sc/$SC_FILE_NAME
+          curl -o In-Compressed/$SC_TEX_FILE_NAME $GAME_ASSET_URL/$FINGERPRINT/sc/$SC_TEX_FILE_NAME
+
+      - name: Docker Run
+        run: |
+          docker run \
+            --name dumpsc \
+            -v $(pwd)/Out-Sprites:/Out-Sprites \
+            -v $(pwd)/In-Compressed:/In-Compressed \
+            dumpsc:latest
+
+      - name: Showoff
+        run: |
+          echo $(ls -R Out-Sprites)
+          echo "It worked. Damn!"
+
+      - name: Compress Files
+        run: zip assets_ui_sc.zip Out-Sprites/**/*.png
+        
+      - name: GCP Login
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+          export_environment_variables: true
+  
+      - name: Upload to GCS
+        id: upload-to-gcs
+        uses: google-github-actions/upload-cloud-storage@v2
+        with:
+          path: assets_ui_sc.zip
+          predefinedAcl: publicRead
+          destination: ${{ env.GCP_BUCKET_NAME }}
+      
+      - name: Uploaded URL
+        run: echo "https://storage.googleapis.com/$GCP_BUCKET_NAME/$UPLOADED_FILE"
+        env:
+          UPLOADED_FILE: ${{ steps.upload-to-gcs.outputs.uploaded }}
+          
