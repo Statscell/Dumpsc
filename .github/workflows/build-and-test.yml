@@ -43,7 +43,7 @@ jobs:
           echo "It worked. Damn!"
 
       - name: Compress Files
-        run: zip assets_ui_sc.zip Out-Sprites/**/*.png
+        run: zip -r assets_ui_sc.zip Out-Sprites
         
       - name: GCP Login
         uses: google-github-actions/auth@v2

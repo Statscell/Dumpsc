@@ -50,7 +50,7 @@ jobs:
             dumpsc:latest
           
       - name: Compress Files
-        run: zip assets.zip Out-Sprites/**/*.png
+        run: zip -r assets.zip Out-Sprites
       
       - id: auth
         uses: google-github-actions/auth@v2
