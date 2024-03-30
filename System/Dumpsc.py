@@ -11,52 +11,7 @@ from System.Logger import Console
 import astc_decomp
 import liblzfse
 
-def load_ktx(data):
-    header = data[:64]
-    ktx_data = data[64:]
-
-    if header[12:16] == bytes.fromhex('01020304'):
-        endianness = '<'
-
-    else:
-        endianness = '>'
-
-    if header[0:7] != b'\xabKTX 11':
-        raise TypeError('Unsupported or unknown KTX version: {}'.format(header[0:7]))
-
-    glInternalFormat, = struct.unpack(endianness + 'I', header[28:32])
-    pixelWidth, pixelHeight = struct.unpack(endianness + '2I', header[36:44])
-    bytesOfKeyValueData, = struct.unpack(endianness + 'I', header[60:64])
-
-    if glInternalFormat not in (0x93B0, 0x93B4, 0x93B7):
-        raise TypeError('Unsupported texture format: {}'.format(hex(glInternalFormat)))
-
-    if glInternalFormat == 0x93B0:
-        block_width, block_height = 4, 4
-
-    elif glInternalFormat == 0x93B4:
-        block_width, block_height = 6, 6
-
-    else:
-        block_width, block_height = 8, 8
-
-    key_value_data = ktx_data[:bytesOfKeyValueData]
-    ktx_data = ktx_data[bytesOfKeyValueData:]
-
-    if b'Compression_APPLE' in key_value_data:
-        if ktx_data[12:15] == b'bvx':
-            image_data = liblzfse.decompress(ktx_data[12:])
-
-        else:
-            raise ValueError('Unsupported compression type: {}'.format(
-                ktx_data[12:15])
-            )
-
-    else:
-        image_data = ktx_data[4:]
-
-    return Image.frombytes('RGBA', (pixelWidth, pixelHeight), image_data, 'astc', (block_width, block_height, False))
-
+from System.Ktx import load_ktx
 
 def convert_pixel(pixel, type):
     if type in (0, 1):
@@ -141,7 +96,7 @@ def decompress_data(data, baseName="Unknown"):
     return decompressed
 
 
-def process_sc(baseName, data, path, decompress):
+def process_sc(texturePath, baseName, data, path, decompress):
     if decompress:
         decompressed = decompress_data(data, baseName)
 
@@ -160,12 +115,21 @@ def process_sc(baseName, data, path, decompress):
             i += 4  # Ignore this uint32, it's basically the fileSize + the size of subType + width + height (9 bytes)
 
         fileSize, = struct.unpack('<I', decompressed[i + 1:i + 5])
-        subType, = struct.unpack('<b', bytes([decompressed[i + 5]]))
-        width, = struct.unpack('<H', decompressed[i + 6:i + 8])
-        height, = struct.unpack('<H', decompressed[i + 8:i + 10])
-        i += 10
+        i += 5
 
-        if fileType != 0x2D:
+        if fileType == 0x2F:
+            zktx_path = decompressed[i + 1: i + 1 + decompressed[i]].decode('utf-8')
+            i += decompressed[i] + 1
+
+        subType, = struct.unpack('<b', bytes([decompressed[i]]))
+        width, = struct.unpack('<H', decompressed[i + 1:i + 3])
+        height, = struct.unpack('<H', decompressed[i + 3:i + 5])
+        i += 5
+
+        print('fileType: {}, fileSize: {}, subType: {}, width: {}, '
+              'height: {}'.format(fileType, fileSize, subType, width, height))
+
+        if fileType != 0x2D and fileType != 0x2F:
             if subType in (0, 1):
                 pixelSize = 4
             elif subType in (2, 3, 4, 6):
@@ -218,6 +182,16 @@ def process_sc(baseName, data, path, decompress):
                     for h in range(width % 32):
                         imgl[h + (width - (width % 32)), j + (height - (height % 32))] = pixels[iSrcPix]
                         iSrcPix += 1
+
+        elif fileType == 0x2F:
+            zktx_path = os.path.join(texturePath, zktx_path)
+
+            if os.path.isfile(zktx_path):
+                with open(zktx_path, 'rb') as f:
+                    img = load_ktx(zstandard.decompress(f.read()))
+
+            else:
+                raise Exception('External KTX texture {} cannot be found !'.format(zktx_path))
 
         else:
             img = load_ktx(decompressed[i:i + fileSize])

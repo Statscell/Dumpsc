@@ -42,8 +42,9 @@ def extract_images():
             with open(f"{input_folder}/{file}", "rb") as f:
                 print('')
                 Console.info(f"Processing {file}")
+                texturePath = os.path.dirname(file)
                 # extracting texture
-                images = process_sc(f"{sc_file_name}_tex", f.read(), f"{sc_output_dir}/texture/", True)
+                images = process_sc(texturePath, f"{sc_file_name}_tex", f.read(), f"{sc_output_dir}/texture/", True)
 
             if sc_file not in files:
                 Console.warn(f"{sc_file} not found! Will skip cutting images")

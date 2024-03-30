@@ -7,5 +7,8 @@ services:
     build:
       context: .
     volumes:
+      - ./System:/System
+      - ./Main.py:/Main.py
+      - ./requirements.txt:/requirements.txt
       - ./Out-Sprites:/Out-Sprites
       - ./In-Compressed:/In-Compressed

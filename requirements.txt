@@ -4,3 +4,4 @@ zstandard
 colorama
 pyliblzfse
 astc_decomp
+texture2ddecoder
